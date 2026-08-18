@@ -1,0 +1,216 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# -----------------------------
+# 1. Generate Customer Data
+# -----------------------------
+np.random.seed(10)
+
+n = 150
+
+customers = pd.DataFrame({
+    "Customer_ID": range(1, n + 1),
+    "X": np.random.uniform(0, 100, n),
+    "Y": np.random.uniform(0, 100, n),
+    "Demand": np.random.randint(50, 500, n)
+})
+
+# -----------------------------
+# 2. Warehouse Locations
+# -----------------------------
+warehouses = {
+    "Current Warehouse": (50, 50),
+    "North Hub": (25, 75),
+    "East Hub": (75, 55),
+    "South Hub": (45, 20),
+    "West Hub": (20, 40)
+}
+
+fixed_cost = {
+    "Current Warehouse": 0,
+    "North Hub": 42000,
+    "East Hub": 47000,
+    "South Hub": 39000,
+    "West Hub": 41000
+}
+
+# Cost per distance-demand unit
+cost_rate = 0.02
+
+# Service distance threshold
+service_limit = 40
+
+# -----------------------------
+# 3. Distance Calculation
+# -----------------------------
+def distance(x1, y1, x2, y2):
+    return np.sqrt((x1-x2)**2 + (y1-y2)**2)
+
+# -----------------------------
+# 4. Scenario Analysis
+# -----------------------------
+results = []
+
+for scenario, location in warehouses.items():
+
+    # Current warehouse = one facility
+    if scenario == "Current Warehouse":
+
+        customers["Distance"] = customers.apply(
+            lambda r: distance(r["X"], r["Y"],
+                               location[0], location[1]), axis=1
+        )
+
+    else:
+        # Customer chooses nearest warehouse
+        current = warehouses["Current Warehouse"]
+
+        customers["Current_Distance"] = customers.apply(
+            lambda r: distance(r["X"], r["Y"],
+                               current[0], current[1]), axis=1
+        )
+
+        customers["New_Distance"] = customers.apply(
+            lambda r: distance(r["X"], r["Y"],
+                               location[0], location[1]), axis=1
+        )
+
+        customers["Distance"] = customers[
+            ["Current_Distance", "New_Distance"]
+        ].min(axis=1)
+
+    # Transportation cost
+    transport_cost = (
+        customers["Distance"] *
+        customers["Demand"] *
+        cost_rate
+    ).sum()
+
+    total_cost = transport_cost + fixed_cost[scenario]
+
+    # Service level
+    service_demand = customers.loc[
+        customers["Distance"] <= service_limit,
+        "Demand"
+    ].sum()
+
+    total_demand = customers["Demand"].sum()
+
+    service_level = (service_demand / total_demand) * 100
+
+    avg_distance = customers["Distance"].mean()
+
+    results.append([
+        scenario,
+        round(transport_cost, 2),
+        fixed_cost[scenario],
+        round(total_cost, 2),
+        round(avg_distance, 2),
+        round(service_level, 2)
+    ])
+
+# -----------------------------
+# 5. Results Table
+# -----------------------------
+results_df = pd.DataFrame(results, columns=[
+    "Scenario",
+    "Transport Cost",
+    "Fixed Cost",
+    "Total Cost",
+    "Average Distance",
+    "Service Level (%)"
+])
+
+print("\nWAREHOUSE SCENARIO ANALYSIS")
+print(results_df.to_string(index=False))
+
+# -----------------------------
+# 6. Find Best Scenario
+# -----------------------------
+best = results_df.loc[results_df["Total Cost"].idxmin()]
+
+print("\nBEST SCENARIO")
+print("Warehouse:", best["Scenario"])
+print("Total Cost:", best["Total Cost"])
+print("Average Distance:", best["Average Distance"])
+print("Service Level:", best["Service Level (%)"], "%")
+
+# -----------------------------
+# 7. Customer Distribution Plot
+# -----------------------------
+plt.figure(figsize=(9, 7))
+
+plt.scatter(
+    customers["X"],
+    customers["Y"],
+    label="Customers",
+    alpha=0.6
+)
+
+for name, (x, y) in warehouses.items():
+    plt.scatter(
+        x, y,
+        marker="*",
+        s=250,
+        label=name
+    )
+
+plt.title("Customer Distribution and Warehouse Locations")
+plt.xlabel("Location X")
+plt.ylabel("Location Y")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# -----------------------------
+# 8. Total Cost Comparison
+# -----------------------------
+plt.figure(figsize=(9, 5))
+
+plt.bar(
+    results_df["Scenario"],
+    results_df["Total Cost"]
+)
+
+plt.title("Scenario Comparison - Total Cost")
+plt.xlabel("Warehouse Scenario")
+plt.ylabel("Total Cost")
+plt.xticks(rotation=20)
+plt.grid(axis="y")
+plt.show()
+
+# -----------------------------
+# 9. Service Level Comparison
+# -----------------------------
+plt.figure(figsize=(9, 5))
+
+plt.plot(
+    results_df["Scenario"],
+    results_df["Service Level (%)"],
+    marker="o"
+)
+
+plt.title("Service-Level Comparison")
+plt.xlabel("Warehouse Scenario")
+plt.ylabel("Service Level (%)")
+plt.xticks(rotation=20)
+plt.grid(True)
+plt.show()
+
+# -----------------------------
+# 10. Average Distance Comparison
+# -----------------------------
+plt.figure(figsize=(9, 5))
+
+plt.bar(
+    results_df["Scenario"],
+    results_df["Average Distance"]
+)
+
+plt.title("Average Shipping Distance")
+plt.xlabel("Warehouse Scenario")
+plt.ylabel("Average Distance")
+plt.xticks(rotation=20)
+plt.grid(axis="y")
+plt.show()
